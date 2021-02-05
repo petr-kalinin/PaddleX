@@ -18,6 +18,7 @@ import os
 import os.path as osp
 import cv2
 import numpy as np
+import pyfakewebcam
 
 from postprocess import postprocess, threshold_mask
 import paddlex as pdx
@@ -70,6 +71,11 @@ def parse_args():
         nargs=2,
         default=[192, 192],
         type=int)
+    parser.add_argument(
+        "--fakecam",
+        dest="fakecam",
+        help="Stream output to fake camera.",
+        action='store_true')
 
     return parser.parse_args()
 
@@ -156,6 +162,10 @@ def infer(args):
             raise Exception(
                 'Please offer backgound image or video. You should set --backbground_iamge_paht or --background_video_path'
             )
+        
+        fakecam = None
+        if args.fakecam:
+            fakecam = pyfakewebcam.FakeWebcam('/dev/video20', resize_w, resize_h)
 
         disflow = cv2.DISOpticalFlow_create(
             cv2.DISOPTICAL_FLOW_PRESET_ULTRAFAST)
@@ -299,9 +309,13 @@ def infer(args):
                         comb = bg_replace(score_map, frame, frame_bg)
                     else:
                         comb = bg_replace(score_map, frame, img_bg)
-                    cv2.imshow('HumanSegmentation', comb)
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
-                        break
+                    if fakecam:
+                        comb = cv2.cvtColor(comb, cv2.COLOR_BGR2RGB)
+                        fakecam.schedule_frame(comb)
+                    else:
+                        cv2.imshow('HumanSegmentation', comb)
+                        if cv2.waitKey(1) & 0xFF == ord('q'):
+                            break
                 else:
                     break
             if is_video_bg:
